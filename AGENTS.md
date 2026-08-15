@@ -55,7 +55,7 @@ Use these in code, comments, packs, and commit messages:
 - A broken logo is a blank slot, not a failed build.
 - Do not document `cargo install tws-tester` until the crate is on crates.io.
 - Do not add network services. `--update` is an outbound fetch of the GitHub latest release; it is not a server.
-- Cargo.toml `version` and the git tag (`v0.1.0`) must match. Release assets include `.sha256` files. Never skip that check in install.sh or `--update`.
+- Cargo.toml `version` and the git tag (for example `v0.1.1`) must match. Release assets include `.sha256` files. Never skip that check in install.sh or `--update`.
 
 ## Hardware (verified vs not)
 

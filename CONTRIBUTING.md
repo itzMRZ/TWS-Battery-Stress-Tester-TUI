@@ -72,6 +72,6 @@ Small diffs. Match the words above. `cargo test --lib -- --skip live_` green. No
 
 ## Release
 
-Keep `Cargo.toml` `version` and the git tag in sync (`v0.1.0`). The Release workflow refuses a mismatch, then attaches Linux and Windows binaries, a `.sha256` file for each, and the install scripts.
+Keep `Cargo.toml` `version` and the git tag in sync (for example `v0.1.1`). The Release workflow refuses a mismatch, then attaches Linux and Windows binaries, a `.sha256` file for each, and the install scripts.
 
 Users install from `releases/latest`. Do not point install docs at `raw/main`.

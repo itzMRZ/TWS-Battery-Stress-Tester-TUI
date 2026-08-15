@@ -76,9 +76,9 @@ mod docs {
     }
 
     #[test]
-    fn crate_version_is_0_1_0() {
-        assert_eq!(env!("CARGO_PKG_VERSION"), "0.1.0");
-        assert!(include_str!("../Cargo.toml").contains("version = \"0.1.0\""));
+    fn crate_version_is_0_1_1() {
+        assert_eq!(env!("CARGO_PKG_VERSION"), "0.1.1");
+        assert!(include_str!("../Cargo.toml").contains("version = \"0.1.1\""));
     }
 
     #[test]
