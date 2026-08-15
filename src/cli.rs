@@ -198,15 +198,15 @@ fn confirm_tws_tester(path: &Path) -> Result<String> {
 }
 
 /// Windows Defender (and similar) can briefly hold a lock on a just-written
-/// executable, turning a normal rename into a transient "access denied" or
+/// file, turning a normal open or rename into a transient "access denied" or
 /// "sharing violation" error. Retry for a moment before giving up, so an
 /// update does not fail just because a scanner won the race.
-fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
+fn retry_io<T>(mut op: impl FnMut() -> io::Result<T>) -> io::Result<T> {
     let attempts = 20;
     let mut last_err = None;
     for attempt in 0..attempts {
-        match fs::rename(from, to) {
-            Ok(()) => return Ok(()),
+        match op() {
+            Ok(v) => return Ok(v),
             Err(e) if is_transient_lock(&e) && attempt + 1 < attempts => {
                 last_err = Some(e);
                 std::thread::sleep(std::time::Duration::from_millis(50));
@@ -226,9 +226,10 @@ fn replace_exe(src: &Path, dest: &Path) -> Result<()> {
     let parent = dest.parent().context("executable directory")?;
     let tmp = parent.join(format!(".tws-tester.new.{}", std::process::id()));
     let bak = parent.join(format!(".tws-tester.bak.{}", std::process::id()));
-    fs::copy(src, &tmp).with_context(|| format!("write {}", tmp.display()))?;
+    retry_io(|| fs::copy(src, &tmp).map(|_| ()))
+        .with_context(|| format!("write {}", tmp.display()))?;
     {
-        let f = File::open(&tmp)?;
+        let f = retry_io(|| File::open(&tmp)).with_context(|| format!("open {}", tmp.display()))?;
         f.sync_all()?;
     }
     #[cfg(unix)]
@@ -237,10 +238,10 @@ fn replace_exe(src: &Path, dest: &Path) -> Result<()> {
         fs::set_permissions(&tmp, fs::Permissions::from_mode(0o755))?;
     }
     if dest.exists() {
-        rename_with_retry(dest, &bak)
+        retry_io(|| fs::rename(dest, &bak))
             .with_context(|| format!("move {} aside (need write access)", dest.display()))?;
     }
-    match rename_with_retry(&tmp, dest) {
+    match retry_io(|| fs::rename(&tmp, dest)) {
         Ok(()) => {
             let _ = fs::remove_file(&bak);
             Ok(())
