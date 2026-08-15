@@ -55,24 +55,6 @@ pub fn update() -> Result<()> {
         bail!("cannot replace {}", dest.display());
     }
 
-    let latest_tag = latest_release_tag()?;
-    let latest = parse_semver(&latest_tag).with_context(|| format!("parse tag {latest_tag}"))?;
-    let current = parse_semver(version()).expect("CARGO_PKG_VERSION is semver");
-    match latest.cmp(&current) {
-        Ordering::Equal => {
-            println!("tws-tester {} is current", version());
-            return Ok(());
-        }
-        Ordering::Less => {
-            println!(
-                "this binary is {} (newer than GitHub {latest_tag}); not downgrading",
-                version()
-            );
-            return Ok(());
-        }
-        Ordering::Greater => {}
-    }
-
     let asset = asset_name_for(std::env::consts::OS, std::env::consts::ARCH)?;
     let url = format!("{REPO_URL}/releases/latest/download/{asset}");
     let sum_url = format!("{url}.sha256");
@@ -99,6 +81,31 @@ pub fn update() -> Result<()> {
     }
     let reported = confirm_tws_tester(&bin)?;
     println!("SHA-256 ok");
+
+    // Compare against the version the downloaded binary itself reports,
+    // not a separate GitHub API call: one less network dependency, and
+    // nothing to rate-limit or block on a restrictive network.
+    let downloaded = reported
+        .strip_prefix("tws-tester ")
+        .and_then(parse_semver)
+        .with_context(|| {
+            format!("downloaded binary reported an unparseable version ({reported})")
+        })?;
+    let current = parse_semver(version()).expect("CARGO_PKG_VERSION is semver");
+    match downloaded.cmp(&current) {
+        Ordering::Equal => {
+            println!("tws-tester {} is current", version());
+            return Ok(());
+        }
+        Ordering::Less => {
+            println!(
+                "this binary is {} (newer than {reported}); not downgrading",
+                version()
+            );
+            return Ok(());
+        }
+        Ordering::Greater => {}
+    }
     println!("{reported}");
 
     match replace_exe(&bin, &dest) {
@@ -116,23 +123,6 @@ pub fn update() -> Result<()> {
             );
         }
     }
-}
-
-fn latest_release_tag() -> Result<String> {
-    let url = format!("https://api.github.com/repos/{REPO_SLUG}/releases/latest");
-    let body = curl_stdout(&url).context("GitHub latest release")?;
-    let v: serde_json::Value = serde_json::from_slice(&body).context("parse GitHub JSON")?;
-    if v.get("message").and_then(|m| m.as_str()) == Some("Not Found") {
-        bail!(
-            "no GitHub release yet. Tag v{} and wait for the Release workflow.",
-            version()
-        );
-    }
-    let tag = v
-        .get("tag_name")
-        .and_then(|t| t.as_str())
-        .context("GitHub latest release has no tag_name")?;
-    Ok(tag.to_string())
 }
 
 pub fn asset_name_for(os: &str, arch: &str) -> Result<&'static str> {
@@ -309,22 +299,6 @@ fn curl_fail(url: &str, err: &str) -> anyhow::Error {
     } else {
         anyhow::anyhow!("download failed ({url}): {err}")
     }
-}
-
-fn curl_stdout(url: &str) -> Result<Vec<u8>> {
-    let mut cmd = Command::new(curl_bin());
-    let out = curl_base(&mut cmd)
-        .arg(url)
-        .output()
-        .context("curl (needed to talk to GitHub)")?;
-    if !out.status.success() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        return Err(curl_fail(url, &err));
-    }
-    if out.stdout.is_empty() {
-        bail!("download was empty: {url}");
-    }
-    Ok(out.stdout)
 }
 
 fn curl_to_file(url: &str, dest: &Path) -> Result<()> {
