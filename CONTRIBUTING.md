@@ -45,7 +45,13 @@ Use these in code, reports, issues, and commits so the tree stays consistent:
 
 ## Hardware
 
-See the [README](README.md#hardware) list. Verified Linux soaks pin MACs in `src/host.rs`. Windows can probe; it cannot play or soak.
+The soak itself (playback and death detection) works with any Bluetooth audio device. Battery reporting depends on having a parser for that brand:
+
+- **Verified on real hardware:** soundcore P30i, Samsung Galaxy Buds2 Pro, Apple AirPods Pro
+- **Parser exists, not yet verified on real hardware:** Beats, Sony, Nothing / CMF, Bose, Oppo / OnePlus / Realme
+- **Recognized by name only, no battery parser:** Xiaomi, Vivo, Google, Huawei, Honor, JBL, Jabra, Sennheiser, Edifier, Marshall
+
+Anything outside these lists still soaks; it just will not show a battery curve. Verified Linux soaks pin MACs in `src/host.rs`. Windows can probe; it cannot play or soak.
 
 ## Issues
 

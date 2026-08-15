@@ -4,75 +4,49 @@
 [![Release](https://img.shields.io/github/v/release/itzMRZ/TWS-Battery-Stress-Tester-TUI)](https://github.com/itzMRZ/TWS-Battery-Stress-Tester-TUI/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Play audio into a Bluetooth headset or earbuds until the audio actually stops. Each run writes a report folder (charts, CSV, events) under `Documents/tws-tester/`.
+Plays audio into a Bluetooth headset or earbuds until playback actually stops, then writes a report (battery charts, CSV, events) to `Documents/tws-tester/`.
 
-> [!NOTE]
-> **Linux** is the supported host. Pair and connect the headset first. **Windows** is experimental and can only capture a probe.
+> Linux is supported. Windows is experimental: it can only capture a probe, not run a soak.
 
 ## Install
 
-### Linux (x86_64)
+Linux (x86_64):
 
 ```
 curl -sSfL https://github.com/itzMRZ/TWS-Battery-Stress-Tester-TUI/releases/latest/download/install.sh | sh
 ```
 
-Installs to `~/.local/bin/tws-tester`. Run the same command again, or `tws-tester --update`, to pull the latest release.
-
-### Windows (x86_64, experimental)
-
-Probe only; playback and reports are not implemented yet.
+Windows (x86_64, experimental):
 
 ```
 irm https://github.com/itzMRZ/TWS-Battery-Stress-Tester-TUI/releases/latest/download/install.ps1 | iex
 ```
 
-## Run
+This installs to `~/.local/bin/tws-tester`. Run `tws-tester --update` later to pull the latest release.
+
+## Use
+
+Pair and connect your headset, then run:
 
 ```
 tws-tester
 ```
 
-Keys live in the app (`?`). Reports stay on disk if the process exits.
+Press `?` in the app for keys. Reports stay on disk if the process exits.
 
 | Command | Purpose |
 | --- | --- |
 | `tws-tester` | Terminal UI |
-| `tws-tester --history` | Open saved reports |
 | `tws-tester probe` | Capture host and device facts |
-| `tws-tester --update` | Latest GitHub release |
-| `tws-tester --version` | Version |
+| `tws-tester --history` | Open saved reports |
+| `tws-tester --update` | Install the latest release |
+| `tws-tester --version` | Print the version |
 
-## Scope
-
-**In**
-
-- One connected Bluetooth audio device (two buds still count as one)
-- A timed run until playback is gone, or until the run is stopped
-- Battery percents when this project has an adapter for that brand
-- A report folder for every run
-
-**Out**
-
-- Vendor-app features (EQ, firmware, gesture maps)
-- A background service
-- Treating a reported 0% as the end of the run while audio still plays
-- Inventing a left/right battery the device never sent
-- Promising every model in a brand from one verified unit
-
-## Hardware
-
-The soak itself (playback and death detection) works with any Bluetooth audio device. Battery reporting depends on having a parser for that brand:
-
-- **Verified on real hardware:** soundcore P30i, Samsung Galaxy Buds2 Pro, Apple AirPods Pro
-- **Parser exists, not yet verified on real hardware:** Beats, Sony, Nothing / CMF, Bose, Oppo / OnePlus / Realme
-- **Recognized by name only, no battery parser:** Xiaomi, Vivo, Google, Huawei, Honor, JBL, Jabra, Sennheiser, Edifier, Marshall
-
-Anything outside these lists still soaks; it just will not show a battery curve.
+Battery percent shows up automatically for supported brands (soundcore, Samsung, and Apple are verified; several others have a parser but are not yet verified on real hardware). Anything else still runs, it just will not show a battery curve. [CONTRIBUTING.md](CONTRIBUTING.md) has the full list.
 
 ## Contributing
 
-Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) is the start. For hardware that is not listed above yet, attach a `tws-tester probe` folder to the issue.
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) is the start.
 
 ## License
 

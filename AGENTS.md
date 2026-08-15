@@ -59,7 +59,7 @@ Use these in code, comments, packs, and commit messages:
 
 ## Hardware (verified vs not)
 
-Same three tiers as the [README](README.md#hardware):
+Same three tiers as [CONTRIBUTING.md](CONTRIBUTING.md#hardware):
 
 - Verified on real hardware: soundcore P30i, Samsung Galaxy Buds2 Pro, Apple AirPods Pro
 - Parser exists, not yet verified on real hardware: Beats, Sony, Nothing/CMF, Bose, Oppo/OnePlus/Realme
