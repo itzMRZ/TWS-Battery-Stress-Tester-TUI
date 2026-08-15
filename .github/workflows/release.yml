@@ -51,7 +51,7 @@ jobs:
           [System.IO.File]::WriteAllText($path, $h, (New-Object System.Text.UTF8Encoding $false))
       - name: publish Linux
         if: matrix.scripts == 'true'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             ${{ matrix.asset }}
@@ -62,7 +62,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: publish Windows
         if: matrix.scripts == 'false'
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             ${{ matrix.asset }}
