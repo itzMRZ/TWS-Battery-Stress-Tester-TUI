@@ -24,7 +24,7 @@ jobs:
             scripts: "false"
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: tag matches Cargo.toml version
         shell: bash
         run: |
