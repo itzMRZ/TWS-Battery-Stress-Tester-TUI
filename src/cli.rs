@@ -197,6 +197,31 @@ fn confirm_tws_tester(path: &Path) -> Result<String> {
     Ok(text)
 }
 
+/// Windows Defender (and similar) can briefly hold a lock on a just-written
+/// executable, turning a normal rename into a transient "access denied" or
+/// "sharing violation" error. Retry for a moment before giving up, so an
+/// update does not fail just because a scanner won the race.
+fn rename_with_retry(from: &Path, to: &Path) -> io::Result<()> {
+    let attempts = 20;
+    let mut last_err = None;
+    for attempt in 0..attempts {
+        match fs::rename(from, to) {
+            Ok(()) => return Ok(()),
+            Err(e) if is_transient_lock(&e) && attempt + 1 < attempts => {
+                last_err = Some(e);
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last_err.expect("loop always sets an error before exhausting attempts"))
+}
+
+fn is_transient_lock(e: &io::Error) -> bool {
+    matches!(e.kind(), io::ErrorKind::PermissionDenied) || e.raw_os_error() == Some(32)
+    // ERROR_SHARING_VIOLATION on Windows
+}
+
 fn replace_exe(src: &Path, dest: &Path) -> Result<()> {
     let parent = dest.parent().context("executable directory")?;
     let tmp = parent.join(format!(".tws-tester.new.{}", std::process::id()));
@@ -212,10 +237,10 @@ fn replace_exe(src: &Path, dest: &Path) -> Result<()> {
         fs::set_permissions(&tmp, fs::Permissions::from_mode(0o755))?;
     }
     if dest.exists() {
-        fs::rename(dest, &bak)
+        rename_with_retry(dest, &bak)
             .with_context(|| format!("move {} aside (need write access)", dest.display()))?;
     }
-    match fs::rename(&tmp, dest) {
+    match rename_with_retry(&tmp, dest) {
         Ok(()) => {
             let _ = fs::remove_file(&bak);
             Ok(())

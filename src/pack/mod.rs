@@ -541,12 +541,9 @@ mod tests {
             .single()
             .expect("valid local time");
         let p = soak_dir("Soundcore P30i", t, SoakKind::Remaining);
-        let s = p.to_string_lossy();
+        let s = p.to_string_lossy().replace('\\', "/");
         assert!(s.contains("runs/Soundcore P30i/"));
-        assert!(
-            s.ends_with("2026-08-15T0146-remaining")
-                || s.replace('\\', "/").ends_with("2026-08-15T0146-remaining")
-        );
+        assert!(s.ends_with("2026-08-15T0146-remaining"));
     }
 
     #[test]

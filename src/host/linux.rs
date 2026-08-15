@@ -38,9 +38,17 @@ pub struct LinuxHost {
 
 impl LinuxHost {
     pub async fn connect() -> Result<Self> {
-        let conn = Connection::system()
+        let conn = Connection::system().await.context("system bus")?;
+        let dbus = zbus::fdo::DBusProxy::new(&conn)
             .await
-            .context("system bus (bluetoothd)")?;
+            .context("system bus")?;
+        let running = dbus
+            .name_has_owner("org.bluez".try_into().context("bus name")?)
+            .await
+            .context("system bus")?;
+        if !running {
+            anyhow::bail!("bluetoothd is not running");
+        }
         Ok(Self {
             conn,
             extras: Arc::new(Mutex::new(HashMap::new())),
