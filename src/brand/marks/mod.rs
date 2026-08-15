@@ -4,6 +4,10 @@
 //! rasterizes every file it finds. A missing or broken asset is a blank slot,
 //! never a panic. Recolor at render with `Brand::ink()`. Assets stay
 //! `currentColor`.
+//!
+//! A brand whose only asset is a wordmark (no separate pictorial glyph)
+//! gets a plain colored initial instead of that wordmark; see
+//! `monogram_letter`. A wordmark just paints as noise at these pixel counts.
 
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -69,13 +73,18 @@ pub fn render(slug: &str, mark: MarkBox) -> Vec<String> {
             return rows.clone();
         }
     }
-    let Some(bmp) = bitmap(asset_key(slug)) else {
-        if let Ok(mut g) = cache.lock() {
-            g.insert(key, Vec::new());
-        }
-        return Vec::new();
+    let rows = match monogram_letter(slug) {
+        Some(ch) => paint_monogram(ch, mark),
+        None => match bitmap(asset_key(slug)) {
+            Some(bmp) => paint(&bmp, mark),
+            None => {
+                if let Ok(mut g) = cache.lock() {
+                    g.insert(key, Vec::new());
+                }
+                return Vec::new();
+            }
+        },
     };
-    let rows = paint(&bmp, mark);
     let rows = if has_ink(&rows) { rows } else { Vec::new() };
     if let Ok(mut g) = cache.lock() {
         g.insert(key, rows.clone());
@@ -84,7 +93,51 @@ pub fn render(slug: &str, mark: MarkBox) -> Vec<String> {
 }
 
 pub fn is_available(slug: &str) -> bool {
-    bitmap(asset_key(slug)).is_some()
+    monogram_letter(slug).is_some() || bitmap(asset_key(slug)).is_some()
+}
+
+/// Brands whose only real asset is a wordmark (a brand identity that is
+/// text, not a pictorial glyph). A wordmark cannot read at a handful of
+/// half-block pixel rows; it just paints as noise. These get a plain
+/// colored initial instead, favicon-style, at every `MarkBox` size.
+fn monogram_letter(slug: &str) -> Option<char> {
+    match slug {
+        "samsung" | "sony" => Some('S'),
+        "jabra" => Some('J'),
+        "marshall" => Some('M'),
+        "nothing" => Some('N'),
+        "cmf" => Some('C'),
+        "honor" => Some('H'),
+        "bose" => Some('B'),
+        "vivo" => Some('V'),
+        "oppo" => Some('O'),
+        "realme" => Some('R'),
+        _ => None,
+    }
+}
+
+/// 5x7 dot-matrix rows, one byte per row (bits 7..3 are columns 0..4).
+fn font_glyph(ch: char) -> Option<&'static [u8]> {
+    match ch {
+        'S' => Some(&[0x78, 0x80, 0x80, 0x70, 0x08, 0x08, 0xf0]),
+        'J' => Some(&[0x38, 0x10, 0x10, 0x10, 0x90, 0x90, 0x60]),
+        'M' => Some(&[0x88, 0xd8, 0xa8, 0xa8, 0x88, 0x88, 0x88]),
+        'N' => Some(&[0x88, 0xc8, 0xa8, 0xa8, 0x98, 0x88, 0x88]),
+        'C' => Some(&[0x70, 0x88, 0x80, 0x80, 0x80, 0x88, 0x70]),
+        'H' => Some(&[0x88, 0x88, 0x88, 0xf8, 0x88, 0x88, 0x88]),
+        'B' => Some(&[0xf0, 0x88, 0x88, 0xf0, 0x88, 0x88, 0xf0]),
+        'V' => Some(&[0x88, 0x88, 0x88, 0x50, 0x50, 0x50, 0x20]),
+        'O' => Some(&[0x70, 0x88, 0x88, 0x88, 0x88, 0x88, 0x70]),
+        'R' => Some(&[0xf0, 0x88, 0x88, 0xf0, 0xa0, 0x90, 0x88]),
+        _ => None,
+    }
+}
+
+fn paint_monogram(ch: char, mark: MarkBox) -> Vec<String> {
+    let Some(bits) = font_glyph(ch) else {
+        return blank(mark);
+    };
+    paint(&Bitmap { w: 5, h: 7, bits }, mark)
 }
 
 /// Slugs that reuse another brand's file. New brands drop a file named after the TUI slug instead.
@@ -96,13 +149,38 @@ fn asset_key(slug: &str) -> &str {
     }
 }
 
+/// Tight box around the ink, in bitmap pixels. Many source assets (a brand
+/// wordmark on a square canvas) leave most of the nominal `w`x`h` blank;
+/// fitting against the full canvas would waste almost all of a compact
+/// mark's few pixel rows on that padding. `None` for an all-blank bitmap.
+fn ink_bbox(bmp: &Bitmap) -> Option<(u32, u32, u32, u32)> {
+    let (mut x0, mut y0) = (u32::MAX, u32::MAX);
+    let (mut x1, mut y1) = (0u32, 0u32);
+    let mut any = false;
+    for y in 0..bmp.h as u32 {
+        for x in 0..bmp.w as u32 {
+            if ink_at(bmp, x, y) {
+                any = true;
+                x0 = x0.min(x);
+                y0 = y0.min(y);
+                x1 = x1.max(x + 1);
+                y1 = y1.max(y + 1);
+            }
+        }
+    }
+    any.then_some((x0, y0, x1, y1))
+}
+
 fn paint(bmp: &Bitmap, mark: MarkBox) -> Vec<String> {
     let cols = mark.cols as usize;
     let rows = mark.rows as usize;
     let dest_w = cols as f32;
     let dest_h = (rows * 2) as f32;
-    let src_w = bmp.w as f32;
-    let src_h = bmp.h as f32;
+    let Some((bx0, by0, bx1, by1)) = ink_bbox(bmp) else {
+        return blank(mark);
+    };
+    let src_w = (bx1 - bx0) as f32;
+    let src_h = (by1 - by0) as f32;
     let scale = (dest_w / src_w).min(dest_h / src_h);
     if !scale.is_finite() || scale <= 0.0 {
         return blank(mark);
@@ -115,10 +193,10 @@ fn paint(bmp: &Bitmap, mark: MarkBox) -> Vec<String> {
     let mut pixels = vec![false; cols * rows * 2];
     for dy in 0..(rows * 2) {
         for dx in 0..cols {
-            let x0 = (dx as f32 - off_x) / scale;
-            let x1 = ((dx + 1) as f32 - off_x) / scale;
-            let y0 = (dy as f32 - off_y) / scale;
-            let y1 = ((dy + 1) as f32 - off_y) / scale;
+            let x0 = bx0 as f32 + (dx as f32 - off_x) / scale;
+            let x1 = bx0 as f32 + ((dx + 1) as f32 - off_x) / scale;
+            let y0 = by0 as f32 + (dy as f32 - off_y) / scale;
+            let y1 = by0 as f32 + ((dy + 1) as f32 - off_y) / scale;
             pixels[dy * cols + dx] = coverage(bmp, x0, y0, x1, y1);
         }
     }
@@ -247,6 +325,32 @@ mod tests {
             render("poco", MarkBox::STANDARD),
             render("xiaomi", MarkBox::STANDARD)
         );
+    }
+
+    #[test]
+    fn wordmark_only_brands_get_a_monogram_not_noise() {
+        for slug in [
+            "samsung", "sony", "jabra", "marshall", "nothing", "cmf", "honor", "bose", "vivo",
+            "oppo", "realme",
+        ] {
+            assert!(is_available(slug), "{slug} should report available");
+            for mark in [MarkBox::COMPACT, MarkBox::STANDARD, MarkBox::LOCKUP] {
+                let rows = render(slug, mark);
+                assert_eq!(rows.len(), mark.rows as usize, "{slug} at {mark:?}");
+                assert!(has_ink(&rows), "{slug} at {mark:?} rendered blank");
+            }
+        }
+        // Distinct brands, not sharing pixels with an unrelated real icon.
+        assert_ne!(
+            render("samsung", MarkBox::COMPACT),
+            render("apple", MarkBox::COMPACT)
+        );
+    }
+
+    #[test]
+    fn unknown_letter_is_blank_not_a_panic() {
+        assert!(font_glyph('Z').is_none());
+        assert!(!has_ink(&paint_monogram('Z', MarkBox::COMPACT)));
     }
 
     #[test]

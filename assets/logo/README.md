@@ -10,6 +10,8 @@ One logo asset per brand. Drop a file here; `build.rs` discovers it on the next 
 
 A parse or raster error prints `cargo:warning=skipping ...` and that brand stays blank.
 
+Some brands ship as a wordmark (their identity is the brand name in a particular type, not a separate pictorial glyph): samsung, sony, jabra, marshall, nothing, cmf, honor, bose, vivo, oppo, realme. A wordmark cannot read at a handful of half-block pixel rows; it paints as noise. `render` in `src/brand/marks/mod.rs` skips those assets and paints a plain colored initial instead (`monogram_letter`). The listed asset stays for provenance; swap it for a real pictorial glyph and drop that brand's `monogram_letter` arm whenever one turns up.
+
 ## Sizes
 
 All SVGs use an intrinsic `viewBox` and omit fixed display dimensions:
