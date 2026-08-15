@@ -1,0 +1,9 @@
+/target
+debug
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+.idea
+*.swp
+.env
+.env.local

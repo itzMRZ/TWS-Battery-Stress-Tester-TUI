@@ -1,0 +1,71 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            bin: tws-tester
+            asset: tws-tester-x86_64-unknown-linux-gnu
+            scripts: "true"
+          - os: windows-latest
+            bin: tws-tester.exe
+            asset: tws-tester-x86_64-pc-windows-msvc.exe
+            scripts: "false"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag matches Cargo.toml version
+        shell: bash
+        run: |
+          expected="${GITHUB_REF_NAME#v}"
+          actual=$(sed -n 's/^version = "\([^"]*\)"/\1/p' Cargo.toml | head -n 1)
+          if [ "$expected" != "$actual" ]; then
+            echo "tag v${expected} does not match Cargo.toml version ${actual}"
+            exit 1
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: name the asset
+        shell: bash
+        run: cp "target/release/${{ matrix.bin }}" "${{ matrix.asset }}"
+      - name: checksum (Linux)
+        if: runner.os == 'Linux'
+        run: sha256sum "${{ matrix.asset }}" | awk '{print $1}' > "${{ matrix.asset }}.sha256"
+      - name: checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash -Algorithm SHA256 "${{ matrix.asset }}").Hash.ToLowerInvariant()
+          $path = Join-Path (Get-Location) "${{ matrix.asset }}.sha256"
+          [System.IO.File]::WriteAllText($path, $h, (New-Object System.Text.UTF8Encoding $false))
+      - name: publish Linux
+        if: matrix.scripts == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.asset }}
+            ${{ matrix.asset }}.sha256
+            scripts/install.sh
+            scripts/install.ps1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: publish Windows
+        if: matrix.scripts == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ matrix.asset }}
+            ${{ matrix.asset }}.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
