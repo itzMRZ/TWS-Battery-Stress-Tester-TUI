@@ -226,11 +226,16 @@ fn replace_exe(src: &Path, dest: &Path) -> Result<()> {
     let parent = dest.parent().context("executable directory")?;
     let tmp = parent.join(format!(".tws-tester.new.{}", std::process::id()));
     let bak = parent.join(format!(".tws-tester.bak.{}", std::process::id()));
-    retry_io(|| fs::copy(src, &tmp).map(|_| ()))
-        .with_context(|| format!("write {}", tmp.display()))?;
     {
-        let f = retry_io(|| File::open(&tmp)).with_context(|| format!("open {}", tmp.display()))?;
-        f.sync_all()?;
+        // A read-only handle cannot be flushed on Windows (fails with
+        // access denied), so copy through a writable handle and sync
+        // that same handle rather than reopening the file afterward.
+        let mut source = File::open(src).with_context(|| format!("open {}", src.display()))?;
+        let mut sink =
+            retry_io(|| File::create(&tmp)).with_context(|| format!("write {}", tmp.display()))?;
+        io::copy(&mut source, &mut sink).with_context(|| format!("write {}", tmp.display()))?;
+        sink.sync_all()
+            .with_context(|| format!("write {}", tmp.display()))?;
     }
     #[cfg(unix)]
     {
